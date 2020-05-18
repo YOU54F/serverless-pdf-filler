@@ -3,6 +3,7 @@ import {
   degrees,
   drawText,
   PDFArray,
+  PDFBool,
   PDFContentStream,
   PDFDict,
   PDFDocument,
@@ -73,21 +74,78 @@ export const fillAcroTextField = (
     acroField.set(PDFName.of("Ff"), PDFNumber.of(1 /* Read Only */));
     acroField.set(PDFName.of("V"), PDFHexString.fromText(text));
 };
-
 export const getAcroFields = (pdfDoc: PDFDocument): PDFDict[] => {
     const acroForm = getAcroForm(pdfDoc);
+    // loggio.info({},"getAcroFields - getAcroForm")
+    // https://github.com/Hopding/pdf-lib/issues/425#issuecomment-620615779
+    // acroForm.set(PDFName.of('NeedAppearances'), PDFBool.True)
 
     if (!acroForm) return [];
 
-    const fieldRefs = acroForm.lookupMaybe(PDFName.of("Fields"), PDFArray);
+    const rootFields = getRootAcroFields(pdfDoc);
 
-    if (!fieldRefs) return [];
+    rootFields.forEach((rootField) => {
+      console.log('rootField');
+      console.log(String(rootField));
+      console.log();
+    });
+  
+    console.log('Total fields:', rootFields.length);
 
-    const fields = new Array(fieldRefs.size());
-    for (let idx = 0, len = fieldRefs.size(); idx < len; idx++) {
-      fields[idx] = fieldRefs.lookup(idx);
+    if (!rootFields) return [];
+
+    const fields: PDFDict[] = [];
+    for (let idx = 0, len = rootFields.length; idx < len; idx++) {
+      fields.push(...recurseAcroFieldKids(rootFields[idx]));
     }
+
+    fields.forEach((field) => {
+      console.log('childField');
+      console.log(String(field));
+      console.log();
+    });
+  
+    console.log('Total childFields:', fields.length);
+  
     return fields;
+};
+
+const getRootAcroFields = (pdfDoc: PDFDocument) => {
+  if (!pdfDoc.catalog.get(PDFName.of('AcroForm'))) return [];
+  const acroForm = pdfDoc.context.lookup(
+    pdfDoc.catalog.get(PDFName.of('AcroForm')),
+    PDFDict,
+  );
+
+  if (!acroForm.get(PDFName.of('Fields'))) return [];
+  const acroFieldRefs = acroForm.context.lookup(
+    acroForm.get(PDFName.of('Fields')),
+    PDFArray,
+  );
+
+  const acroFields = new Array<PDFDict>(acroFieldRefs.size());
+  for (let idx = 0, len = acroFieldRefs.size(); idx < len; idx++) {
+    acroFields[idx] = pdfDoc.context.lookup(acroFieldRefs.get(idx), PDFDict);
+  }
+
+  return acroFields;
+};
+
+const recurseAcroFieldKids = (field: PDFDict) => {
+  const kids = field.lookupMaybe(PDFName.of('Kids'), PDFArray);
+  if (!kids) return [field];
+
+  const acroFields = new Array<PDFDict>(kids.size());
+  for (let idx = 0, len = kids.size(); idx < len; idx++) {
+    acroFields[idx] = field.context.lookup(kids.get(idx), PDFDict);
+  }
+
+  const flatKids: PDFDict[] = [];
+  for (let idx = 0, len = acroFields.length; idx < len; idx++) {
+    flatKids.push(...recurseAcroFieldKids(acroFields[idx]));
+  }
+
+  return flatKids;
 };
 
 const beginMarkedContent = (tag: string) =>
