@@ -1,0 +1,31 @@
+{
+  "name": "pdf-form-node",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "pdf:single": "ts-node single.ts",
+    "pdf:multiple": "ts-node multiple.ts",
+    "pdf:fix:single": "qpdf filled_single.pdf - > fixed_single.pdf",
+    "pdf:fix:multiple": "qpdf filled_multiple.pdf - > fixed_multiple.pdf",
+    "single": "yarn run pdf:single && yarn run pdf:fix:single",
+    "multiple": "yarn run pdf:multiple && yarn run pdf:fix:multiple"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "0.0.4",
+    "@types/node": "^14.0.1",
+    "pdf-lib": "^1.5.0",
+    "ts-node": "^8.10.1",
+    "typescript": "^3.9.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.0.0",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1"
+  },
+  "author": "YOU54F",
+  "license": ""
+}
