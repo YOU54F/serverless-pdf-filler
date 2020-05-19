@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { PDFArray, PDFDict, PDFDocument, PDFName } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
 
 const recurseAcroFieldKids = (field: PDFDict) => {
   const kids = field.lookupMaybe(PDFName.of('Kids'), PDFArray);
@@ -44,25 +44,25 @@ const getRootAcroFields = (pdfDoc: PDFDocument) => {
 
   const rootFields = getRootAcroFields(pdfDoc);
 
-  rootFields.forEach((rootField) => {
-    console.log('rootField');
-    console.log(String(rootField));
-    console.log();
-  });
+  // rootFields.forEach((rootField) => {
+  //   console.log('rootField');
+  //   console.log(String(rootField));
+  //   console.log();
+  // });
 
   console.log('Total fields:', rootFields.length);
 
 
   const fields: PDFDict[] = [];
-  for (let idx = 0, len = rootFields.length; idx < len; idx++) {
+  for (let idx = 0, len = rootFields  .length; idx < len; idx++) {
     fields.push(...recurseAcroFieldKids(rootFields[idx]));
   }
 
-  fields.forEach((field) => {
-    console.log('childField');
-    console.log(String(field));
-    console.log();
-  });
+  // fields.forEach((field) => {
+  //   console.log('childField');
+  //   console.log(String(field));
+  //   console.log();
+  // });
 
   console.log('Total childFields:', fields.length);
 })();

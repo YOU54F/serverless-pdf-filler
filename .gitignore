@@ -1,3 +1,5 @@
 node_modules
 filled*.pdf
 fixed*.pdf
+coverage
+.DS_Store
