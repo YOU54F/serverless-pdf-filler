@@ -16,8 +16,8 @@ import { fillInField, getAcroFields, lockField } from "./utils";
   Object.entries(formValuesMultiple).forEach((entry) => {
     fillInField(pdfDoc, entry[0], entry[1], helveticaFont);
   });
-  const acroFieldsMultiple = getAcroFields(pdfDoc);
-  acroFieldsMultiple.forEach((field) => lockField(field));
+  // const acroFieldsMultiple = getAcroFields(pdfDoc,helveticaFont);
+  // acroFieldsMultiple.forEach((field) => lockField(field));
 
   const pdfBytesMultiple = await pdfDoc.save();
 
