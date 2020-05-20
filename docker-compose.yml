@@ -1,0 +1,12 @@
+version: "3.1"
+services:
+  pdf_service:
+    build:
+      context: .
+      dockerfile: local/docker/pdfOffline.Dockerfile
+    volumes:
+        - ./tmp:/tmp
+    entrypoint: "bash -c 'yarn run start'"
+    ports:
+      - 3009:3009
+      - 4569:4569

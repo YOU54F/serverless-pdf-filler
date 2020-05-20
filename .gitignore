@@ -1,5 +1,13 @@
 node_modules
-filled*.pdf
-fixed*.pdf
-coverage
+.serverless
+.webpack
+buckets
+node_modules
+out*.json
 .DS_Store
+tmp/*.pdf
+tmp/*.json
+.project
+out/
+coverage/
+.vscode
