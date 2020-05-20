@@ -26,16 +26,7 @@ export const fillInField = (
   text: string,
   font: PDFFont
 ) => {
-  // console.log(`field name to find in findAcroFieldByName is ${fieldName}`)
-
-  const field = findAcroFieldByName(pdfDoc, fieldName,font);
-  // const field = findAcroFieldByNameWithFont(pdfDoc, fieldName,text,font);
-  console.log(
-    `findAcroFieldByName status ${
-      field ? "TRUE" : "FALSE"
-    } when looked up by ${fieldName}`
-  );
-  if (field) fillAcroTextField(field, text, font);
+  findAcroFieldByName(pdfDoc, fieldName, font, text);
 };
 
 export const lockField = (acroField: PDFDict) => {
@@ -48,26 +39,14 @@ export const lockField = (acroField: PDFDict) => {
 export const getAcroForm = (pdfDoc: PDFDocument) =>
   pdfDoc.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
 
-
-export const findAcroFieldByName = (pdfDoc: PDFDocument, name: string, font: PDFFont) => {
+export const findAcroFieldByName = (
+  pdfDoc: PDFDocument,
+  name: string,
+  font: PDFFont,
+  text: string
+) => {
   console.log(`findAcroFieldByName is looking up ${name}`);
-  const acroFields = getAcroFields(pdfDoc,font);
-  console.log(`getAcroFields found  ${acroFields.length} things`);
-
-  return acroFields.find((acroField) => {
-    const parentName = acroField.get(PDFName.of("Parent"));
-    const fieldName = acroField.get(PDFName.of("T"));
-    console.log(
-      `found a field matching ${name}: ${
-        acroField ? "acroField: TRUE" : "acroField:FALSE"
-      } which has the the fieldName ${fieldName} with a daddy ${parentName}`
-    );
-    // console.log(acroField)
-    return (
-      (fieldName instanceof PDFString || fieldName instanceof PDFHexString) &&
-      fieldName.decodeText() === name
-    );
-  });
+  const acroFields = getAcroFields(pdfDoc, font, text, name);
 };
 
 export const fillAcroTextField = (
@@ -96,11 +75,16 @@ export const fillAcroTextField = (
   acroField.set(PDFName.of("V"), PDFHexString.fromText(text));
 };
 
-export const getAcroFields = (pdfDoc: PDFDocument, font: PDFFont): PDFDict[] => {
+export const getAcroFields = (
+  pdfDoc: PDFDocument,
+  font: PDFFont,
+  text: string,
+  name: string
+) => {
   const acroForm = getAcroForm(pdfDoc);
   if (!acroForm) return [];
   // https://github.com/Hopding/pdf-lib/issues/425#issuecomment-620615779
-  // acroForm.set(PDFName.of('NeedAppearances'), PDFBool.True)
+  acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
 
   // 2. If a root field has kids, recurse through the the kids details
   // 3. For each of the returned children, merge the parent or childrens properties
@@ -108,83 +92,41 @@ export const getAcroFields = (pdfDoc: PDFDocument, font: PDFFont): PDFDict[] => 
   const rootFields = getRootAcroFields(pdfDoc);
   if (!rootFields) return [];
   const childFields: PDFDict[] = [];
-  const rootFieldsWithoutChildren: PDFDict[] = [];
-  const rootFieldsWithChildren: PDFDict[] = [];
-  let rootFieldsMergedChildren: PDFDict[] = [];
-  let mergedFields: PDFDict[] = [];
   // 1. Go through all root fields
   rootFields.forEach((rootField) => {
+    const fieldName = rootField.get(PDFName.of("T"));
+    const fieldNameText = rootField
+      .lookupMaybe(PDFName.of("T"), PDFString)
+      ?.decodeText();
+    const haskids = rootField.get(PDFName.of("Kids"));
     console.log(
-      `Found a field with text: ${rootField.lookupMaybe(
-        PDFName.of("T"),
-        PDFString
-      )}, checking if it has child elements`
+      `Found a field with text: ${fieldName}, checking if it has child elements`
     );
     // 2. Split the root fields into those with childrean
-    if (rootField.lookup(PDFName.of("Kids"))) {
-      rootFieldsWithChildren.push(rootField);
-    } else {
-      rootFieldsWithoutChildren.push(rootField);
+
+    if (haskids && fieldNameText === name) {
+      childFields.push(...recurseAcroFieldKids(rootField));
+      childFields.forEach((childField) => {
+        const hasParent = childField.lookup(PDFName.of("Parent"));
+        console.log(
+          `child field field - Looking up ${name} and found (${fieldName}) - hasParent: ${hasParent}`
+        );
+        if (hasParent) {
+          console.log(`child field - matched (${fieldName})`);
+          fillAcroTextField(childField, text, font);
+        }
+      });
+    }
+    console.log(`root field - Looking up ${name} and found (${fieldName})`);
+    if (
+      (fieldName instanceof PDFString || fieldName instanceof PDFHexString) &&
+      fieldName.decodeText() === name &&
+      !haskids
+    ) {
+      console.log(`root field - matched (${fieldName})`);
+      fillAcroTextField(rootField, text, font);
     }
   });
-
-  console.log(`
-    rootFields: ${rootFields.length} \n
-    rootFieldsWithChildren: ${rootFieldsWithChildren.length} \n
-    rootFieldsWithoutChildren: ${rootFieldsWithoutChildren.length} \n
-    `);
-
-  if (rootFieldsWithChildren !== []) {
-    // get values for each
-    // 2. If a root field has kids, get the children
-    for (let idx = 0, len = rootFieldsWithChildren.length; idx < len; idx++) {
-      childFields.push(...recurseAcroFieldKids(rootFieldsWithChildren[idx]));
-    }
-  
-    childFields.forEach((childField) => {
-
-      fillAcroTextField(childField,'test',font)
-      
-      // childField.set(PDFName.of("T"),PDFString.of('multiple'))
-      // childField.set(PDFName.of("V"),PDFString.of('multiple'))
-        // attach the props from
-        // childField.set(PDFName.of("Font"),PDFString.of('/Helv 6 Tf 0 g'))
-    // acroFields[idx].set(PDFName.of("T"),PDFString.of('multiple'))
-      // childField.set(
-      //   PDFName.of("V"),
-      //   PDFString.of(
-      //     "this is tffffs"
-      //   )
-      // );
-    });
-    
-    return childFields
-    // return [...childFields,...rootFieldsWithoutChildren];
-    // return [...rootFieldsWithoutChildren,...childFields];
-  } else if (
-    rootFieldsWithChildren === [] &&
-    rootFieldsWithoutChildren !== []
-  ) {
-    console.log(
-      `return rootFieldsWithoutChildren: ${rootFieldsWithoutChildren.length}`
-    );
-    return rootFieldsWithoutChildren;
-  } else {
-    console.log(`return rootFields: ${rootFields.length}`);
-    return rootFields;
-  }
-
-  // if ((rootField.lookup(PDFName.of("Kids")))){
-  //   console.log(`Found a child for the field with text: ${rootField.lookupMaybe(PDFName.of("T"), PDFString)}`);
-  //   for (let idx = 0, len = rootFields.length; idx < len; idx++) {
-  //     childFields.push(...recurseAcroFieldKids(rootFields[idx]));
-  //   }
-  // }
-  //   childFields.forEach((childField) => {
-  //     let mergedField = childField & rootField
-  //     mergedFields.push(mergedField)
-  //   })
-  // })
 };
 
 const getRootAcroFields = (pdfDoc: PDFDocument) => {
@@ -213,33 +155,13 @@ const recurseAcroFieldKids = (field: PDFDict) => {
   if (!kids) return [field];
   const acroFields = new Array<PDFDict>(kids.size());
   for (let idx = 0, len = kids.size(); idx < len; idx++) {
-    acroFields[idx] = field.context.lookup(kids.get(idx), PDFDict)
-    // acroFields[idx].set(PDFName.of("T"),PDFString.of('multiple'))
+    acroFields[idx] = field.context.lookup(kids.get(idx), PDFDict);
   }
   const flatKids: PDFDict[] = [];
   for (let idx = 0, len = acroFields.length; idx < len; idx++) {
-    // attach the props from
-    // acroFields[idx].set(PDFName.of("DA"),PDFString.of('/Helv 6 Tf 0 g'))
-    // 
-    // acroFields[idx].set(PDFName.of("T"),PDFString.of('multiple'))
-    // acroFields[idx].set(PDFName.of("V"),PDFString.of('multiple'))
     flatKids.push(...recurseAcroFieldKids(acroFields[idx]));
   }
   return flatKids;
-};
-
-const recurseAcroFields = (field: PDFDict) => {
-  const fields = field.lookupMaybe(PDFName.of("Fields"), PDFArray);
-  if (!fields) return [field];
-  const acroFields = new Array<PDFDict>(fields.size());
-  for (let idx = 0, len = fields.size(); idx < len; idx++) {
-    acroFields[idx] = field.context.lookup(fields.get(idx), PDFDict);
-  }
-  const flatFields: PDFDict[] = [];
-  for (let idx = 0, len = acroFields.length; idx < len; idx++) {
-    flatFields.push(...recurseAcroFields(acroFields[idx]));
-  }
-  return flatFields;
 };
 
 const beginMarkedContent = (tag: string) =>
