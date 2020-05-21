@@ -5,10 +5,11 @@ import {
   localS3rverConfig,
   uploadPdfToBucket,
   context,
-  getEvent,
+  testEvent,
   testPdfName
 } from "./utils/utils";
 import { s3client } from "../utils/s3Client";
+
 let instance: S3rver;
 
 describe("Handler tests", () => {
@@ -31,7 +32,7 @@ describe("Handler tests", () => {
   it("should return 200 when it process a PDF successfully", async () => {
     // Act
     await uploadPdfToBucket(testPdfName);
-    const sut = await handler(getEvent(), context);
+    const sut = await handler(testEvent, context);
     // Assert
     const result = JSON.parse(`${sut}`);
     expect(result.body).toContain("JVBERi0xLjcKJb/3ov4KMSAwIG9iago8PCAv");
@@ -41,9 +42,11 @@ describe("Handler tests", () => {
 
     // Act
     const sut = await handler(
-      getEvent("not_a_file"),
+      {...testEvent,
+      template: "not_a_file"},
       context
-    );    // Assert
+    );
+    // Assert
     const result = JSON.parse(`${sut}`);
     expect(result.StatusCode).toEqual(404);
     expect(result.FunctionError).toContain("The specified key does not exist.");

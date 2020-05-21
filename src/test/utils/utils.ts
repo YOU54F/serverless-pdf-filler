@@ -1,11 +1,8 @@
 import { Context } from "aws-lambda";
-import {
-  PdfLambdaRequest,
-  PdfInputValues,
-} from "../..";
 import { S3, AWSError } from "aws-sdk";
 import { readFileSync } from "fs";
 import { s3client } from "../../utils/s3Client";
+import { PdfInputValues, PdfLambdaRequest } from "index";
 export const testPdfName = "test.pdf";
 
 export const params = {
@@ -32,10 +29,10 @@ export const defaultFormValues: PdfInputValues = {
   multiple: "text to input into a multiple fields"
 };
 
-export const getEvent = (template?: string, formValues?:PdfInputValues): PdfLambdaRequest => {
-  return { template: template? template: testPdfName, formValues: formValues ? formValues : defaultFormValues};
+export const testEvent: PdfLambdaRequest = {
+  template: testPdfName,
+  formValues: defaultFormValues
 };
-
 
 export const expectedErrorResponse: string = JSON.stringify({
   StatusCode: 400,

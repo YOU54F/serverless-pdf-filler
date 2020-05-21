@@ -35,6 +35,9 @@ export const handler: InvocationRequestHandler = async (
     if (templateName == null || !templateName) {
       throw new Error("No template name specified");
     }
+    if (formValues == null || !formValues) {
+      throw new Error("No form values specified");
+    }
     const fileStream = await downloadFromS3ToStream(
       bucketName,
       templateName,

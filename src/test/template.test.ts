@@ -1,5 +1,5 @@
 import {
-  getEvent,
+  testEvent,
   testPdfName
 } from "./utils/utils";
 import { readFileSync } from "fs";
@@ -27,9 +27,9 @@ describe("Template tests", () => {
 
     const templateServiceParams: TemplateServiceRequest = {
       pdfDocument,
-      formValues: getEvent().formValues,
-      templateName: getEvent().template,
-      logger,
+      formValues: testEvent.formValues,
+      templateName: testEvent.template,
+      logger
     };
 
     const returnedDocument = await templateService(templateServiceParams);
@@ -40,9 +40,9 @@ describe("Template tests", () => {
 
     const templateServiceParams: TemplateServiceRequest = {
       pdfDocument: "pdfDocument",
-      formValues: getEvent().formValues,
-      templateName: getEvent().template,
-      logger,
+      formValues: testEvent.formValues,
+      templateName: testEvent.template,
+      logger
     };
 
     const returnedDocument = await templateService(templateServiceParams);

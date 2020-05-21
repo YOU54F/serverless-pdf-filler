@@ -4,8 +4,8 @@ import {
   params,
   localS3rverConfig,
   uploadPdfToBucket,
-  getEvent,
-  testPdfName
+  testEvent,
+  testPdfName,
 } from "./utils/utils";
 import pino from "pino";
 import { PdfLambdaRequest } from "..";
@@ -36,7 +36,7 @@ describe("Handler tests", () => {
     // Act
     await uploadPdfToBucket(testPdfName);
 
-    const sut = await clientLogic(getEvent());
+    const sut = await clientLogic(testEvent);
 
     expect(sut.result.StatusCode).toEqual(200);
     expect(sut.result.FunctionError).toBeUndefined();
@@ -45,8 +45,8 @@ describe("Handler tests", () => {
   });
   it("should return an error if something goes wrong", async () => {
     // Act
-    const brokenEvent = getEvent('not_a_file');
-    const sut = await clientLogic(brokenEvent);
+
+    const sut = await clientLogic({ ...testEvent, template: "not_a_file" });
     expect(sut.result.StatusCode).toEqual(200);
     expect(sut.result.FunctionError).toBeUndefined();
     expect(sut.parsed.body).toBeUndefined();
@@ -73,9 +73,7 @@ export const getPdfLambdaProvider = () => ({
   },
 });
 
-export const clientLogic = async (
-  event: PdfLambdaRequest
-) => {
+export const clientLogic = async (event: PdfLambdaRequest) => {
   const lambda = getPdfLambdaProvider().createLambda();
   const result = await lambda
     .invoke({
