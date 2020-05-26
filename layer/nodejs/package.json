@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "pdf-lib": "^1.5.0",
-    "@pdf-lib/fontkit": "0.0.4",
+    "@pdf-lib/fontkit": "1.0.0",
     "@rauschma/stringio": "^1.4.0",
     "pino": "^6.2.1"
   }
