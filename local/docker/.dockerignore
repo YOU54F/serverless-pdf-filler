@@ -1,0 +1,7 @@
+.circleci
+.webpack
+buckets
+pdf-templates
+tmp
+local
+node_modules

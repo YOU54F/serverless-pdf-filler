@@ -1,0 +1,42 @@
+version: 2.1
+
+jobs:
+  build:
+    machine: true
+
+    steps:
+      - run:
+          name: Install Qpdf
+          command: sudo apt-get update && sudo apt-get install -y qpdf
+
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "yarn.lock" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run:
+          name: Install Dependencies
+          command: yarn install --frozen-lockfile
+
+      - save_cache:
+          name: Save Yarn Package Cache
+          key: v1-yarn-packages-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.cache/yarn
+
+      - run:
+          name: Run lint
+          command: yarn lint
+
+      - run:
+          name: Run tests
+          command: yarn test:all
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build

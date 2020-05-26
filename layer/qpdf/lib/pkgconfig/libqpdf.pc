@@ -1,0 +1,11 @@
+prefix=/opt
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libqpdf
+Description: PDF transformation library
+Version: 8.4.1
+Requires.private: zlib, libjpeg
+Libs: -L${libdir} -lqpdf
+Cflags: -I${includedir}

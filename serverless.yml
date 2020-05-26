@@ -1,0 +1,75 @@
+service: serverless-pdf-filler
+
+provider:
+  name: aws
+  versionFunctions: false
+  runtime: nodejs12.x
+  region: eu-west-2
+  stage: ${opt:stage, 'local'}
+  environment:
+    PDF_TEMPLATE_BUCKET: pdf-templates-${self:provider.stage}
+    CURRENT_ENV: ${opt:stage, 'local'}
+    LOCAL_S3_URL: ${env:LOCAL_S3_URL, 'http://localhost:4569'}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "s3:GetObject"
+      Resource:
+        Fn::Join:
+          - ""
+          - - "arn:aws:s3:::"
+            - "Ref": "PdfTemplateBucket"
+            - "/*"
+
+plugins:
+  - serverless-webpack
+  - '@you54f/serverless-offline'
+  - serverless-s3-local
+
+layers:
+  Pdflib:
+    name: Pdflib
+    compatibleRuntimes:
+      - nodejs12.x
+    description: Required for Pdflib
+    package:
+      artifact: layer/pdflib-layer.zip
+  Qpdf:
+    name: Qpdf
+    description: Adds the qpdf executable to the environment
+    package:
+      artifact: layer/qpdf.zip
+
+custom:
+  webpack:
+    webpackConfig: webpack.config.js
+    includeModules:
+      forceExclude:
+        - pdf-lib
+        - aws-sdk
+    packager: "yarn"
+  s3:
+    address: "0.0.0.0"
+  serverless-offline:
+    location: .webpack/service
+
+functions:
+  generate-pdf:
+    name: serverless-pdf-filler-${self:provider.stage}
+    handler: src/functions/pdf.generate
+    layers:
+      - { Ref: PdflibLambdaLayer }
+      - { Ref: QpdfLambdaLayer }
+
+
+resources:
+  Resources:
+    PdfTemplateBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: pdf-templates-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
