@@ -15,7 +15,6 @@ To run:
 ```sh
 yarn install // Install Deps
 make local-pdf-service // Start the local service
-make local-bucket-populate // Add PDF templates to local S3 instance
 ```
 
 To invoke:
