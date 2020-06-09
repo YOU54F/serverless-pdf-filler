@@ -42,7 +42,6 @@ yarn run test:all
 It will also output each PDF template filled in to `./tmp/filled_****.pdf`
 And the QPDF output will be at `./tmp/fixed_****.pdf`
 
-
 ## Packaging Runtime Dependencies
 
 ### Generate the layer for running pdf-lib
@@ -51,4 +50,4 @@ Run `make layer-pdflib`
 
 ### Generate the layer for running qpdf
 
-Run `make layer-qpdf`
+Run `make layer-qpdf-zip`

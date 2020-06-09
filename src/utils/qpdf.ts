@@ -1,5 +1,4 @@
 import { spawn } from "child_process";
-const { readableToString } = require("@rauschma/stringio");
 import { readFileSync } from "fs";
 import pino from "pino";
 
@@ -9,17 +8,33 @@ export const spawnQpdf = (
 ): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
-      logger.info("Calling QPDF to correct output");
-      let args = ["qpdf"];
-      args.push(`tmp/filled_${input}`);
-      args.push(`tmp/fixed_${input}`);
-      const childProcess = spawn("/bin/sh", ["-c", args.join(" ")]);
-      await readableToString(childProcess.stdout);
+      if (!input) {
+        return reject("No data found");
+      }
 
-      logger.info("Successfully fixed PDF with QPDF and written to temp file");
-      const encodedPDF = readFileSync(`tmp/fixed_${input}`, "base64");
-      logger.info("Returning base64 encoded PDF");
-      return resolve(encodedPDF);
+      let args = ["qpdf"];
+      args.push(`/tmp/filled_${input}`);
+      args.push(`/tmp/fixed_${input}`);
+      logger.info({ args }, "Calling QPDF to correct output");
+
+      const qpdfCLI = spawn("/bin/sh", ["-c", args.join(" ")]);
+
+      //   qpdfCLI.stdout.on('data', data => {
+      //     logger.info({},`stdout`);
+      // });
+
+      qpdfCLI.stderr.on("data", (data) => {
+        logger.error({ error: data.toString() }, `stderr`);
+      });
+
+      qpdfCLI.on("close", (code) => {
+        logger.info({ code }, `QPDF process exited with code ${code}`);
+        if (code === 0) {
+          resolve(readFileSync(`/tmp/fixed_${input}`, "base64"));
+        } else {
+          reject(`Exit code ${code}`);
+        }
+      });
     } catch (e) {
       logger.error(
         { e },

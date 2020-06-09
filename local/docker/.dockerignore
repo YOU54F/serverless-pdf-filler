@@ -5,3 +5,9 @@ pdf-templates
 tmp
 local
 node_modules
+tmp
+layer
+.serverless
+.vscode
+coverage
+out

@@ -7,13 +7,12 @@ import {
   testEvent,
   testPdfName,
 } from "./utils/utils";
-import pino from "pino";
+import { getMockLogger } from "./utils/getMockLogger";
 import { PdfLambdaRequest } from "..";
 import { s3client } from "../utils/s3Client";
-const dest = pino.destination({ sync: false });
-const logger = pino(dest).child({
-  serviceName: "handlerTest",
-});
+
+const logger = getMockLogger();
+
 let instance: S3rver;
 const pdfServiceFunctionName = "serverless-pdf-filler-local";
 describe("Handler tests", () => {
@@ -33,20 +32,21 @@ describe("Handler tests", () => {
   });
 
   it("should return 200 with a valid PDF template", async () => {
-    // Act
+    // Arrange
     await uploadPdfToBucket(testPdfName);
-
+    // Act
     const sut = await clientLogic(testEvent);
-
+    // Assert
     expect(sut.result.StatusCode).toEqual(200);
     expect(sut.result.FunctionError).toBeUndefined();
     expect(sut.parsed.body.length).toBeGreaterThan(0);
     expect(sut.parsed.body).toContain("JVBERi0xLjcKJb/3ov4KMSAwIG9iago8PCAv");
   });
   it("should return an error if something goes wrong", async () => {
+    
     // Act
-
     const sut = await clientLogic({ ...testEvent, template: "not_a_file" });
+    // Assert
     expect(sut.result.StatusCode).toEqual(200);
     expect(sut.result.FunctionError).toBeUndefined();
     expect(sut.parsed.body).toBeUndefined();

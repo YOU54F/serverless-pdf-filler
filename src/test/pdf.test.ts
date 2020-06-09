@@ -6,11 +6,13 @@ import {
   uploadPdfToBucket,
   context,
   testEvent,
-  testPdfName
+  testPdfName,
 } from "./utils/utils";
 import { s3client } from "../utils/s3Client";
+import { getMockLogger } from "./utils/getMockLogger";
 
 let instance: S3rver;
+const logger = getMockLogger();
 
 describe("Handler tests", () => {
   beforeAll(async () => {
@@ -18,9 +20,9 @@ describe("Handler tests", () => {
     instance.run();
     try {
       const createdBucket = await s3client().createBucket(params).promise();
-      console.log(createdBucket);
+      logger.info(createdBucket);
     } catch (error) {
-      console.log(error);
+      logger.error(error);
     }
   });
 
@@ -28,22 +30,19 @@ describe("Handler tests", () => {
     await instance.close();
   });
 
-
   it("should return 200 when it process a PDF successfully", async () => {
-    // Act
+    // Arrange
     await uploadPdfToBucket(testPdfName);
+    // Act
     const sut = await handler(testEvent, context);
     // Assert
     const result = JSON.parse(`${sut}`);
     expect(result.body).toContain("JVBERi0xLjcKJb/3ov4KMSAwIG9iago8PCAv");
   });
   it("should return 404 when a template doesnt exist", async () => {
-    // Arrange
-
     // Act
     const sut = await handler(
-      {...testEvent,
-      template: "not_a_file"},
+      { ...testEvent, template: "not_a_file" },
       context
     );
     // Assert
