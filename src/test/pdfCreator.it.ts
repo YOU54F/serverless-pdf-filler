@@ -1,12 +1,5 @@
 import { Lambda } from "aws-sdk";
-import S3rver from "s3rver";
-import {
-  params,
-  localS3rverConfig,
-  uploadPdfToBucket,
-  testEvent,
-  testPdfName,
-} from "./utils/utils";
+import { testEvent } from "./utils/utils";
 import { getMockLogger } from "./utils/getMockLogger";
 import { PdfLambdaRequest } from "..";
 
@@ -14,11 +7,7 @@ const logger = getMockLogger();
 
 const pdfServiceFunctionName = "serverless-pdf-filler-local";
 describe("Handler tests", () => {
-
-
   it("should return 200 with a valid PDF template", async () => {
-    // Arrange
-    await uploadPdfToBucket(testPdfName);
     // Act
     const sut = await clientLogic(testEvent);
     // Assert
@@ -28,7 +17,6 @@ describe("Handler tests", () => {
     expect(sut.parsed.body).toContain("JVBERi0xLjcKJb/3ov4KMSAwIG9iago8PCAv");
   });
   it("should return an error if something goes wrong", async () => {
-    
     // Act
     const sut = await clientLogic({ ...testEvent, template: "not_a_file" });
     // Assert
