@@ -4,18 +4,15 @@ import {
 } from "./utils/utils";
 import { readFileSync } from "fs";
 import { TemplateServiceRequest, templateService } from "../utils/template";
-import pino from "pino";
-const dest = pino.destination({ sync: false });
+import { getMockLogger } from "./utils/getMockLogger";
 
-const logger = pino(dest).child({
-  serviceName: "templateTest",
-});
+const logger = getMockLogger();
 
 export const readPdf = async (filename: string): Promise<Buffer | Error> => {
   try {
     return readFileSync(`./pdf-templates/${filename}`);
   } catch (error) {
-    console.log(error);
+    logger.error(error);
     return error;
   }
 };

@@ -1,6 +1,7 @@
 const webpack = require('webpack')
 const path = require('path')
 const slsw = require('serverless-webpack')
+const CopyWebpackPlugin = require('copy-webpack-plugin')
 const nodeExternals = require('webpack-node-externals')
 module.exports = {
   entry: slsw.lib.entries,
@@ -18,6 +19,17 @@ module.exports = {
       {
         test: /\.ts$/,
         loader: 'ts-loader'
+      },
+      {
+        test: /\.(woff(2)?|ttf|eot|svg)(\?v=\d+\.\d+\.\d+)?$/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[name].[ext]'
+            }
+          }
+        ]
       }
     ]
   },
@@ -32,6 +44,7 @@ module.exports = {
   plugins: [
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'development'
-    })
+    }),
+    new CopyWebpackPlugin({ patterns: [{ from: 'fonts' }] })
   ]
 }

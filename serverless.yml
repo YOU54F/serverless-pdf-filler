@@ -1,13 +1,21 @@
 service: serverless-pdf-filler
 
+plugins:
+  - serverless-webpack
+  - serverless-offline
+  - serverless-s3-local
+  - serverless-s3-sync
+  - serverless-s3-local-sync
+  
 provider:
   name: aws
   versionFunctions: false
+  versionLayers: false
   runtime: nodejs12.x
   region: eu-west-2
   stage: ${opt:stage, 'local'}
   environment:
-    PDF_TEMPLATE_BUCKET: pdf-templates-${self:provider.stage}
+    PDF_TEMPLATE_BUCKET: serverless-pdf-filler-templates-${self:provider.stage}
     CURRENT_ENV: ${opt:stage, 'local'}
     LOCAL_S3_URL: ${env:LOCAL_S3_URL, 'http://localhost:4569'}
   iamRoleStatements:
@@ -21,10 +29,14 @@ provider:
             - "Ref": "PdfTemplateBucket"
             - "/*"
 
-plugins:
-  - serverless-webpack
-  - '@you54f/serverless-offline'
-  - serverless-s3-local
+functions:
+  generate-pdf:
+    name: serverless-pdf-filler-${self:provider.stage}
+    handler: src/functions/pdf.handler
+    timeout: 15
+    layers:
+      - { Ref: PdflibLambdaLayer }
+      - { Ref: QpdfLambdaLayer }
 
 layers:
   Pdflib:
@@ -38,38 +50,34 @@ layers:
     name: Qpdf
     description: Adds the qpdf executable to the environment
     package:
-      artifact: layer/qpdf.zip
-
-custom:
-  webpack:
-    webpackConfig: webpack.config.js
-    includeModules:
-      forceExclude:
-        - pdf-lib
-        - aws-sdk
-    packager: "yarn"
-  s3:
-    address: "0.0.0.0"
-  serverless-offline:
-    location: .webpack/service
-
-functions:
-  generate-pdf:
-    name: serverless-pdf-filler-${self:provider.stage}
-    handler: src/functions/pdf.generate
-    layers:
-      - { Ref: PdflibLambdaLayer }
-      - { Ref: QpdfLambdaLayer }
-
+      artifact: layer/qpdf-layer.zip
 
 resources:
   Resources:
     PdfTemplateBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: pdf-templates-${self:provider.stage}
+        BucketName: serverless-pdf-filler-templates-${self:provider.stage}
         PublicAccessBlockConfiguration:
           BlockPublicAcls: true
           BlockPublicPolicy: true
           IgnorePublicAcls: true
           RestrictPublicBuckets: true
+
+custom:
+  s3Sync:
+    - bucketName: serverless-pdf-filler-templates-${self:provider.stage}
+      localDir: pdf-templates/
+  webpack:
+    webpackConfig: webpack.config.js
+    includeModules:
+      forceExclude:
+        - pdf-lib
+        - "@pdf-lib/fontkit"
+        - aws-sdk
+    packager: "yarn"
+  s3:
+    address: "0.0.0.0"
+    port: 4569
+  serverless-offline:
+    location: .webpack/service

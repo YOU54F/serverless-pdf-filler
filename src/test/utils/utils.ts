@@ -6,7 +6,7 @@ import { PdfInputValues, PdfLambdaRequest } from "index";
 export const testPdfName = "test.pdf";
 
 export const params = {
-  Bucket: "pdf-templates-local",
+  Bucket: "serverless-pdf-filler-templates-local",
 };
 
 export const context: Context = {
@@ -26,12 +26,12 @@ export const context: Context = {
 
 export const defaultFormValues: PdfInputValues = {
   single: "text to input into a single field",
-  multiple: "text to input into a multiple fields"
+  multiple: "text to input into a multiple fields",
 };
 
 export const testEvent: PdfLambdaRequest = {
   template: testPdfName,
-  formValues: defaultFormValues
+  formValues: defaultFormValues,
 };
 
 export const expectedErrorResponse: string = JSON.stringify({

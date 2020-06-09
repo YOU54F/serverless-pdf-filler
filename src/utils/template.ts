@@ -1,7 +1,6 @@
 import {
   asPDFName,
   degrees,
-  drawText,
   PDFArray,
   PDFContentStream,
   PDFDict,
@@ -16,17 +15,15 @@ import {
   PDFOperatorNames as Ops,
   popGraphicsState,
   pushGraphicsState,
-  StandardFonts,
   rgb,
+  breakTextIntoLines,
+  drawLinesOfText,
 } from "pdf-lib";
 import pino from "pino";
+import fontkit from "@pdf-lib/fontkit";
 import { PdfInputValues } from "..";
 import { writeFileSync } from "fs";
-const dest = pino.destination({ sync: false });
-
-const logger = pino(dest).child({
-  serviceName: "serverless-pdf-filler",
-});
+import fetch from "node-fetch";
 
 export interface TemplateServiceRequest {
   pdfDocument: AWS.S3.Body;
@@ -47,46 +44,67 @@ export const templateService = async ({
   logger,
 }: TemplateServiceRequest): Promise<TemplateServiceResult> => {
   try {
-    const pdfDoc = await PDFDocument.load(
-      pdfDocument as string | Uint8Array | ArrayBuffer
-    );
-    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const pdfDoc = await PDFDocument.load(pdfDocument as ArrayBuffer);
+
+    const customFontBytes = await fetch(
+      "https://github.com/YOU54F/arial.ttf/raw/master/arialmt.ttf"
+    ).then((res) => res.arrayBuffer());
+
+    pdfDoc.registerFontkit(fontkit);
+    const font = await pdfDoc.embedFont(customFontBytes);
+
+    pdfDoc.setCreator("Yousaf Nabi");
+    pdfDoc.setProducer("Yousaf Nabi");
+
     logger.info("Processing form values and injecting into PDF");
     Object.entries(formValues).forEach(async (entry) => {
-      await findAndFillInField(
+      await findAndFillInForm({
         pdfDoc,
-        entry[0],
-        entry[1] as string,
-        helveticaFont
-      );
+        fieldName: entry[0],
+        text: entry[1] as string,
+        font,
+        logger,
+      });
     });
-    logger.info("Filled PDF succcessfully, locking fields");
+
     const acroFields: PDFDict[] = getAcroFields(pdfDoc);
     acroFields.forEach((field) => lockField(field));
+
     logger.info("Locked fields succcessfully, saving PDF");
-    const pdfBytes = await pdfDoc.save();
-    logger.info("Writing filled PDF out to file");
-    writeFileSync(`tmp/filled_${templateName}`, pdfBytes);
+    const pdfBytes = await pdfDoc.save({ useObjectStreams: true });
+
+    logger.info("Filled PDF succcessfully, writing to file");
+
+    writeFileSync(`/tmp/filled_${templateName}`, pdfBytes);
+
     const result: TemplateServiceResult = { result: true };
     return result;
   } catch (e) {
-    const result: TemplateServiceResult = { result: false, error: e.toString() };
+    const result: TemplateServiceResult = {
+      result: false,
+      error: e.toString(),
+    };
     return result;
   }
 };
 
-export const fillInField = (
-  pdfDoc: PDFDocument,
-  fieldName: string,
-  text: string,
-  font: PDFFont
-) => {
+export const getAcroFields = (pdfDoc: PDFDocument): PDFDict[] => {
   try {
-    logger.info({ fieldName }, "Populating form field with supplied value");
-    const field = findAcroFieldByName(pdfDoc, fieldName);
-    if (field) fillAcroTextField(field, text, font);
+    const acroForm = getAcroForm(pdfDoc);
+
+    if (!acroForm) return [];
+
+    acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+
+    const fieldRefs = acroForm.lookupMaybe(PDFName.of("Fields"), PDFArray);
+    if (!fieldRefs) return [];
+
+    const fields = new Array(fieldRefs.size());
+    for (let idx = 0, len = fieldRefs.size(); idx < len; idx++) {
+      fields[idx] = fieldRefs.lookup(idx);
+    }
+    return fields;
   } catch (e) {
-    logger.error({ error: e }, "fillInField");
     return e;
   }
 };
@@ -98,71 +116,6 @@ export const lockField = (acroField: PDFDict) => {
       acroField.set(PDFName.of("Ff"), PDFNumber.of(1 << 0 /* Read Only */));
     }
   } catch (e) {
-    logger.error({ error: e }, "lockField");
-    return e;
-  }
-};
-
-export const getAcroForm = (pdfDoc: PDFDocument) =>
-  pdfDoc.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
-
-export const findAcroFieldByName = (pdfDoc: PDFDocument, name: string) => {
-  try {
-    const acroFields = getAcroFields(pdfDoc);
-
-    return acroFields.find((acroField) => {
-      const fieldName = acroField.get(PDFName.of("T"));
-
-      return (
-        (fieldName instanceof PDFString || fieldName instanceof PDFHexString) &&
-        fieldName.decodeText() === name
-      );
-    });
-  } catch (e) {
-    logger.error({ error: e }, "findAcroFieldByName");
-    return e;
-  }
-};
-
-export const fillAcroTextField = (
-  acroField: PDFDict,
-  text: string,
-  font: PDFFont
-) => {
-  try {
-    const rect = acroField.lookup(PDFName.of("Rect"), PDFArray);
-    const width =
-      rect.lookup(2, PDFNumber).value() - rect.lookup(0, PDFNumber).value();
-    const height =
-      rect.lookup(3, PDFNumber).value() - rect.lookup(1, PDFNumber).value();
-
-    const N = singleLineAppearanceStream(font, text, width, height);
-
-    acroField.set(PDFName.of("AP"), acroField.context.obj({ N }));
-    acroField.set(PDFName.of("Ff"), PDFNumber.of(1 /* Read Only */));
-    acroField.set(PDFName.of("V"), PDFHexString.fromText(text));
-  } catch (e) {
-    logger.error({ error: e }, "fillAcroTextField");
-    return e;
-  }
-};
-
-export const getAcroFields = (pdfDoc: PDFDocument): PDFDict[] => {
-  try {
-    const acroForm = getAcroForm(pdfDoc);
-
-    if (!acroForm) return [];
-    acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
-    const fieldRefs = acroForm.lookupMaybe(PDFName.of("Fields"), PDFArray);
-    if (!fieldRefs) return [];
-
-    const fields = new Array(fieldRefs.size());
-    for (let idx = 0, len = fieldRefs.size(); idx < len; idx++) {
-      fields[idx] = fieldRefs.lookup(idx);
-    }
-    return fields;
-  } catch (e) {
-    logger.error({ error: e }, "getAcroFields");
     return e;
   }
 };
@@ -172,42 +125,67 @@ const beginMarkedContent = (tag: string) =>
 
 const endMarkedContent = () => PDFOperator.of(Ops.EndMarkedContent);
 
-const singleLineAppearanceStream = (
-  font: PDFFont,
-  text: string,
-  width: number,
-  height: number
-) => {
+const multiLineAppearanceStream = ({
+  font,
+  text,
+  width,
+  height,
+}: ApprearanceStreamOptions) => {
+  const size = 6;
+  const textWidth = (t: string) => font.widthOfTextAtSize(t, size);
+  const encodedTextLines = breakTextIntoLines(
+    text,
+    [" "],
+    width,
+    textWidth
+  ).map((line: string) => font.encodeText(line));
+  const x = 0;
+  const y = height - size;
+  return textFieldAppearanceStream({
+    font,
+    size,
+    encodedTextLines,
+    x,
+    y,
+    width,
+    height,
+  });
+};
+const singleLineAppearanceStream = ({
+  font,
+  text,
+  width,
+  height,
+}: ApprearanceStreamOptions) => {
   try {
-    const size = font.sizeAtHeight(height - 5);
-    const encodedText = font.encodeText(text);
+    const size = font.sizeAtHeight(height - 2);
+    const encodedTextLines = [font.encodeText(text)];
     const x = 0;
     const y = height - size;
 
-    return textFieldAppearanceStream(
+    return textFieldAppearanceStream({
       font,
       size,
-      encodedText,
+      encodedTextLines,
       x,
       y,
       width,
-      height
-    );
+      height,
+    });
   } catch (e) {
-    logger.error({ error: e }, "singleLineAppearanceStream");
     return e;
   }
 };
 
-const textFieldAppearanceStream = (
-  font: PDFFont,
-  size: number,
-  encodedText: PDFHexString,
-  x: number,
-  y: number,
-  width: number,
-  height: number
-) => {
+const textFieldAppearanceStream = ({
+  font,
+  size,
+  encodedTextLines,
+  x,
+  y,
+  width,
+  height,
+}: TextFieldApprearanceStreamOptions) => {
   try {
     const dict = font.doc.context.obj({
       Type: "XObject",
@@ -220,25 +198,55 @@ const textFieldAppearanceStream = (
     const operators = [
       beginMarkedContent("Tx"),
       pushGraphicsState(),
-      ...drawText(encodedText, {
+      ...drawLinesOfText(encodedTextLines, {
         color: rgb(0, 0, 0),
         font: "F0",
-        size,
+        size: size,
         rotate: degrees(0),
         xSkew: degrees(0),
         ySkew: degrees(0),
-        x,
-        y,
+        x: x,
+        y: y,
+        lineHeight: size + 2,
       }),
       popGraphicsState(),
       endMarkedContent(),
     ];
-
     const stream = PDFContentStream.of(dict, operators);
 
     return font.doc.context.register(stream);
   } catch (e) {
-    logger.error({ error: e }, "textFieldAppearanceStream");
+    return e;
+  }
+};
+
+const getAcroForm = (pdfDoc: PDFDocument) =>
+  pdfDoc.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
+
+const findAndFillInForm = ({
+  pdfDoc,
+  fieldName,
+  text,
+  font,
+  logger,
+}: FillFormOptions) => {
+  try {
+    const acroForm = getAcroForm(pdfDoc);
+    if (!acroForm) return [];
+    acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+
+    const rootFields = getRootAcroFields(pdfDoc);
+    if (!rootFields) return [];
+
+    rootFields.forEach((acroField: PDFDict) => {
+      fillChildFieldsByName({ acroField, fieldName, text, font, logger });
+      fillRootFieldByName({ acroField, fieldName, text, font, logger });
+    });
+  } catch (e) {
+    logger.error(
+      { error: e, functionName: "fillAcroFieldsByName" },
+      "An error occurred filling a field in the form"
+    );
     return e;
   }
 };
@@ -264,7 +272,68 @@ const getRootAcroFields = (pdfDoc: PDFDocument) => {
 
     return acroFields;
   } catch (e) {
-    logger.error({ error: e }, "getRootAcroFields");
+    return e;
+  }
+};
+
+const fillRootFieldByName = ({
+  acroField,
+  fieldName,
+  text,
+  font,
+  logger,
+}: FillFormFieldOptions) => {
+  try {
+    const formName = acroField.get(PDFName.of("T"));
+    const hasKids = acroField.get(PDFName.of("Kids"));
+
+    if (
+      (formName instanceof PDFString || formName instanceof PDFHexString) &&
+      formName.decodeText() === fieldName &&
+      !hasKids
+    ) {
+      logger.info(`Found: ${formName} root field and filling field.`);
+      fillAcroTextField({ acroField, text, font });
+    }
+  } catch (e) {
+    logger.error(
+      { error: e, functionName: "fillRootFieldByName" },
+      "An error occurred filling a field in the form"
+    );
+    return e;
+  }
+};
+
+const fillChildFieldsByName = ({
+  acroField,
+  fieldName,
+  text,
+  font,
+  logger,
+}: FillFormFieldOptions) => {
+  try {
+    const childFields: PDFDict[] = [];
+    const formName = acroField.get(PDFName.of("T"));
+    const hasKids = acroField.get(PDFName.of("Kids"));
+    const formNameText = acroField
+      .lookupMaybe(PDFName.of("T"), PDFString)
+      ?.decodeText();
+    if (hasKids && formNameText && formNameText.toString() === fieldName) {
+      acroField.set(PDFName.of("V"), PDFHexString.fromText(text));
+      childFields.push(...recurseAcroFieldKids(acroField));
+      childFields.forEach((childField) => {
+        const hasParent = childField.lookup(PDFName.of("Parent"));
+        if (hasParent) {
+          logger.info(`Found: ${formName} child field and filling field.`);
+          fillAcroTextField({ acroField: childField, text, font });
+        }
+      });
+    }
+  } catch (e) {
+    logger.error(
+      { error: e, functionName: "fillChildFieldsByName" },
+      "An error occurred filling a field in the form"
+    );
     return e;
   }
 };
@@ -283,114 +352,70 @@ const recurseAcroFieldKids = (field: PDFDict) => {
     }
     return flatKids;
   } catch (e) {
-    logger.error({ error: e }, "recurseAcroFieldKids");
     return e;
   }
 };
 
-export const findAndFillInField = (
-  pdfDoc: PDFDocument,
-  fieldName: string,
-  text: string,
-  font: PDFFont
-) => {
+const fillAcroTextField = ({
+  acroField,
+  text,
+  font,
+  singleline = false,
+}: FillAcroTextField) => {
   try {
-    findAndFillAcroFieldByName(pdfDoc, fieldName, font, text);
+    const rect = acroField.lookup(PDFName.of("Rect"), PDFArray);
+    const width =
+      rect.lookup(2, PDFNumber).value() - rect.lookup(0, PDFNumber).value();
+    const height =
+      rect.lookup(3, PDFNumber).value() - rect.lookup(1, PDFNumber).value();
+
+    const N = singleline
+      ? singleLineAppearanceStream({ font, text, width, height })
+      : multiLineAppearanceStream({ font, text, width, height });
+
+    acroField.set(PDFName.of("AP"), acroField.context.obj({ N }));
+    acroField.set(PDFName.of("V"), PDFHexString.fromText(text));
   } catch (e) {
-    logger.error({ error: e }, "findAndFillInField");
     return e;
   }
 };
 
-export const findAndFillAcroFieldByName = (
-  pdfDoc: PDFDocument,
-  name: string,
-  font: PDFFont,
-  text: string
-) => {
-  try {
-    logger.info(`findAcroFieldByName is looking up ${name}`);
-    fillAcroFieldsByName(pdfDoc, font, text, name);
-  } catch (e) {
-    logger.error({ error: e }, "findAndFillAcroFieldByName");
-    return e;
-  }
-};
+interface FillFormOptions {
+  pdfDoc: PDFDocument;
+  fieldName: string;
+  text: string;
+  font: PDFFont;
+  logger: pino.Logger;
+}
 
-export const fillAcroFieldsByName = (
-  pdfDoc: PDFDocument,
-  font: PDFFont,
-  text: string,
-  name: string
-) => {
-  try {
-    const acroForm = getAcroForm(pdfDoc);
-    if (!acroForm) return [];
-    // https://github.com/Hopding/pdf-lib/issues/425#issuecomment-620615779
-    acroForm.set(PDFName.of("NeedAppearances"), PDFBool.True);
+interface FillFormFieldOptions {
+  acroField: PDFDict;
+  fieldName: string;
+  text: string;
+  font: PDFFont;
+  logger: pino.Logger;
+}
 
-    const rootFields = getRootAcroFields(pdfDoc);
-    if (!rootFields) return [];
+interface FillAcroTextField {
+  acroField: PDFDict;
+  text: string;
+  font: PDFFont;
+  singleline?: boolean;
+}
 
-    rootFields.forEach((rootField:PDFDict) => {
-      fillChildFieldsByName(rootField, font, text, name);
-      fillRootFieldsByName(rootField, font, text, name);
-    });
-  } catch (e) {
-    logger.error({ error: e }, "fillAcroFieldsByName");
-    return e;
-  }
-};
+interface TextFieldApprearanceStreamOptions {
+  font: PDFFont;
+  size: number;
+  encodedTextLines: PDFHexString[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
-export const fillChildFieldsByName = (
-  rootField: PDFDict,
-  font: PDFFont,
-  text: string,
-  name: string
-) => {
-  try {
-    const childFields: PDFDict[] = [];
-    const fieldName = rootField.get(PDFName.of("T"));
-    const hasKids = rootField.get(PDFName.of("Kids"));
-    const fieldNameText = rootField
-      .lookupMaybe(PDFName.of("T"), PDFString)
-      ?.decodeText();
-    if (hasKids && fieldNameText && fieldNameText.toString() === name) {
-      childFields.push(...recurseAcroFieldKids(rootField));
-      childFields.forEach((childField) => {
-        const hasParent = childField.lookup(PDFName.of("Parent"));
-        if (hasParent) {
-          logger.info(`Found: ${fieldName} child field and filling field.`);
-          fillAcroTextField(childField, text, font);
-        }
-      });
-    }
-  } catch (e) {
-    logger.error({ error: e }, "fillChildFieldsByName");
-    return e;
-  }
-};
-
-export const fillRootFieldsByName = (
-  rootField: PDFDict,
-  font: PDFFont,
-  text: string,
-  name: string
-) => {
-  try {
-    const fieldName = rootField.get(PDFName.of("T"));
-    const hasKids = rootField.get(PDFName.of("Kids"));
-
-    if (
-      (fieldName instanceof PDFString || fieldName instanceof PDFHexString) &&
-      fieldName.decodeText() === name &&
-      !hasKids
-    ) {
-      logger.info(`Found: ${fieldName} root field and filling field.`);
-      fillAcroTextField(rootField, text, font);
-    }
-  } catch (e) {
-    logger.error({ error: e }, "fillRootFieldsByName");
-    return e;
-  }
-};
+interface ApprearanceStreamOptions {
+  font: PDFFont;
+  text: string;
+  width: number;
+  height: number;
+}

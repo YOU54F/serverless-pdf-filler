@@ -1,15 +1,15 @@
 import { S3 } from "aws-sdk";
 import pino from "pino";
-import {getEnv} from "../utils/getEnv";
+import { getEnv } from "../utils/getEnv";
 import { stageIsLocal } from "../utils/isLocal";
 
 export const s3client = (): S3 => {
-  const stage = getEnv("CURRENT_ENV","local");
+  const stage = getEnv("CURRENT_ENV", "local");
   const isLocal = stageIsLocal(stage);
   if (isLocal) {
-    const endpoint = getEnv("LOCAL_S3_URL","http://localhost:4569");
-    const accessKeyId = getEnv("LOCAL_AWS_ACCESS_KEY_ID","S3RVER");
-    const secretAccessKey = getEnv("LOCAL_AWS_SECRET_ACCESS_KEY","S3RVER");
+    const endpoint = getEnv("LOCAL_S3_URL", "http://localhost:4569");
+    const accessKeyId = getEnv("LOCAL_AWS_ACCESS_KEY_ID", "S3RVER");
+    const secretAccessKey = getEnv("LOCAL_AWS_SECRET_ACCESS_KEY", "S3RVER");
     return new S3({
       s3ForcePathStyle: true,
       accessKeyId,
@@ -17,7 +17,7 @@ export const s3client = (): S3 => {
       endpoint,
     });
   } else {
-    return new S3()
+    return new S3();
   }
 };
 

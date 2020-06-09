@@ -15,3 +15,5 @@ EOF
 
 cd layer/qpdf || exit
 ln -s bin/qpdf qpdf
+
+zip -9r qpdf-layer.zip ./bin ./lib qpdf

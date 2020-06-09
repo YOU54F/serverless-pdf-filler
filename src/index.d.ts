@@ -5,7 +5,7 @@ import { AWSError } from "aws-sdk";
 export type InvocationRequestHandler = (
   event: PdfLambdaRequest,
   context: Context
-) => Promise<String | AWSError>;
+) => Promise<string | AWSError>;
 
 export interface PdfLambdaRequest {
   template: string;

@@ -11,3 +11,4 @@ tmp/*.json
 out/
 coverage/
 .vscode
+layer/qpdf/
