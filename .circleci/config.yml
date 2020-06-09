@@ -2,7 +2,8 @@ version: 2.1
 
 jobs:
   build:
-    machine: true
+    machine:
+      image: ubuntu-1604:201903-01
 
     steps:
       - run:
@@ -10,6 +11,28 @@ jobs:
           command: sudo apt-get update && sudo apt-get install -y qpdf
 
       - checkout
+      
+      - run:
+          name: install nvm
+          command: |
+              curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.5/install.sh | bash
+              export NVM_DIR="/opt/circleci/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+              nvm install 12
+              nvm alias default 12
+
+              # Each step uses the same `$BASH_ENV`, so need to modify it
+              echo 'export NVM_DIR="/opt/circleci/.nvm"' >>$BASH_ENV
+              echo "[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"" >>$BASH_ENV
+
+      - run:
+          name: install yarn
+          command: |
+              curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+              echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+              sudo killall -9 apt-get || true && sudo apt-get update && sudo apt-get -y install yarn
+              yarn_global_bin=$(yarn global bin)
+              sudo echo 'export PATH="$PATH:$yarn_global_bin"' >>$BASH_ENV
 
       - restore_cache:
           keys:
