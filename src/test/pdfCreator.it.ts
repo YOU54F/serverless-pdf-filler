@@ -9,27 +9,12 @@ import {
 } from "./utils/utils";
 import { getMockLogger } from "./utils/getMockLogger";
 import { PdfLambdaRequest } from "..";
-import { s3client } from "../utils/s3Client";
 
 const logger = getMockLogger();
 
-let instance: S3rver;
 const pdfServiceFunctionName = "serverless-pdf-filler-local";
 describe("Handler tests", () => {
-  beforeAll(async () => {
-    instance = new S3rver(localS3rverConfig);
-    instance.run();
-    try {
-      const createdBucket = await s3client().createBucket(params).promise();
-      logger.info({ createdBucketResponse: createdBucket.$response });
-    } catch (error) {
-      logger.info({ error: error.message });
-    }
-  });
 
-  afterAll(async () => {
-    await instance.close();
-  });
 
   it("should return 200 with a valid PDF template", async () => {
     // Arrange
