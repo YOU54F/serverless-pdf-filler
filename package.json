@@ -23,7 +23,7 @@
     "node-fetch": "^2.6.0",
     "pdf-lib": "^1.7.0",
     "pino": "^6.2.1",
-    "serverless": "1.71.1",
+    "serverless": "1.72.0",
     "serverless-s3-local-sync": "^1.1.0",
     "serverless-s3-sync": "^1.14.3",
     "typescript": "^3.9.2"
