@@ -50,7 +50,7 @@
     "ts-jest": "26.0.0",
     "ts-loader": "7.0.4",
     "webpack": "4.43.0",
-    "webpack-node-externals": "1.7.2"
+    "webpack-node-externals": "2.5.2"
   },
   "author": "Yousaf Nabi",
   "license": "MIT"
