@@ -1,4 +1,4 @@
-FROM node:12.18.0-stretch-slim
+FROM node:12.22.1-stretch-slim
 
 RUN apt-get update && apt-get install -y qpdf
 
