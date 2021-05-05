@@ -46,7 +46,7 @@
     "serverless-domain-manager": "4.0.1",
     "serverless-offline": "6.4.0",
     "serverless-s3-local": "0.6.1",
-    "serverless-webpack": "5.3.2",
+    "serverless-webpack": "5.4.1",
     "ts-jest": "26.0.0",
     "ts-loader": "7.0.4",
     "webpack": "4.46.0",
